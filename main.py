@@ -6,6 +6,7 @@ import threading
 import time
 from logging.handlers import RotatingFileHandler
 import socket
+import sys
 
 # Erstelle das Log-Verzeichnis, falls es nicht existiert
 os.makedirs('logs', exist_ok=True)
@@ -69,10 +70,13 @@ from dotenv import load_dotenv
 import paho.mqtt.client as mqtt
 from apscheduler.schedulers.background import BackgroundScheduler
 
-from src import database, google_drive
+from src import database
 from src.frigate_api import fetch_all_events
 from src.google_drive import cleanup_old_files_on_drive, service
 from src.mattermost_handler import MattermostHandler
+
+from src.uploader.google_drive import GoogleDriverUploader
+from src.uploader.webdav import WebDavUploader
 
 # Lade Umgebungsvariablen
 try:
@@ -90,6 +94,8 @@ MQTT_USER = os.getenv('MQTT_USER')
 MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
 MATTERMOST_WEBHOOK_URL = os.getenv('MATTERMOST_WEBHOOK_URL')
 
+UPLOADER = os.getenv('UPLOADER').lower()
+
 # Mattermost-Handler hinzufügen, falls konfiguriert
 if MATTERMOST_WEBHOOK_URL:
     try:
@@ -104,6 +110,13 @@ if MATTERMOST_WEBHOOK_URL:
 else:
     logger.warning("MATTERMOST_WEBHOOK_URL nicht gesetzt. Mattermost-Benachrichtigungen sind deaktiviert.")
 
+if UPLOADER == "google":
+    upload_handler = GoogleDriverUploader()
+elif UPLOADER == "webdav":
+    upload_handler = WebDavUploader()
+else:
+    logging.fatal(f"Unknown configuration value: UPLOADER = '{UPLOADER}'")
+    sys.exit(1)
 
 def on_connect(client, userdata, flags, reason_code, properties):
     logging.info(f"MQTT connected with result code {reason_code}")
@@ -150,7 +163,7 @@ def handle_single_event(event_data):
                 logging.debug("Waiting 5 seconds for Frigate to finalize the clip...")
                 time.sleep(5)
                 logging.debug(f"Uploading video {event_id} to Google Drive...")
-                success = google_drive.upload_to_google_drive(event_data, FRIGATE_URL)
+                success = upload_handler.upload(event_data, FRIGATE_URL)
                 if success:
                     logging.info(f"Video {event_id} successfully uploaded.")
                     database.update_event(event_id, 1)

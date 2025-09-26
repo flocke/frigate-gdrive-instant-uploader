@@ -10,19 +10,18 @@ from googleapiclient.http import MediaIoBaseUpload
 
 from src.uploader.generic import GenericUploader
 
-SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE')
-GOOGLE_ACCOUNT_TO_IMPERSONATE = os.getenv('GOOGLE_ACCOUNT_TO_IMPERSONATE')
-
-SCOPES = ['https://www.googleapis.com/auth/drive']
-
 class GoogleDriverUploader(GenericUploader):
     def __init__(self):
-        if GOOGLE_ACCOUNT_TO_IMPERSONATE:
+        service_account_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE')
+        account_to_impersonate = os.getenv('GOOGLE_ACCOUNT_TO_IMPERSONATE')
+        scopes = ['https://www.googleapis.com/auth/drive']
+
+        if account_to_impersonate:
             credentials = service_account.Credentials.from_service_account_file(
-                SERVICE_ACCOUNT_FILE, scopes=SCOPES, subject=GOOGLE_ACCOUNT_TO_IMPERSONATE)
+                service_account_file, scopes=scopes, subject=account_to_impersonate)
         else:
             credentials = service_account.Credentials.from_service_account_file(
-                SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+                service_account_file, scopes=scopes)
         
         self.service = build('drive', 'v3', credentials=credentials)
 
